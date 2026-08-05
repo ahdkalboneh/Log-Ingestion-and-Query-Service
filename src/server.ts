@@ -1,7 +1,7 @@
 import { app } from "./app.js";
 import { db, checkDatabaseConnection } from "./db/index.js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { setReady } from "./app.js";
+import { setReady } from "./modules/health/health_handler.js";
 
 async function start() {
   try {
