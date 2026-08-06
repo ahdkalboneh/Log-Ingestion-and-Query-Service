@@ -1,14 +1,17 @@
-import { copyLogsToDB } from "../../db/queries/logs_copy.js";
+import { copyLogsToDB } from "../../db/queries/logs.js";
 import type {LogEntry, LogCopyItem, ValidationResult,} from "../../types/logs.js";
 
 let logsBuffer: LogCopyItem[] = [];
 
-const BUFFER_CAPACITY = 30000; 
-const BATCH_FLUSH_SIZE = 5000; 
-const FLUSH_TIME_INTERVAL = 100; 
+const BUFFER_CAPACITY = 20000; 
+const BATCH_FLUSH_SIZE = 2500; 
+const FLUSH_TIME_INTERVAL = 250; 
 
 let flush_timer: ReturnType<typeof setTimeout> | null = null;
 let is_flushing = false;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const VALID_LEVELS = new Set(["debug", "info", "warn", "error"]);
 
 function isValidLog(entry: any): ValidationResult {
     if (!entry || typeof entry !== "object") {
@@ -20,26 +23,28 @@ function isValidLog(entry: any): ValidationResult {
 
     const { timestamp, level, service, message, attributes } = entry;
 
-    if (!timestamp || isNaN(Date.parse(timestamp))) {
+    if (!timestamp || typeof timestamp !== "string" || !ISO_DATE_REGEX.test(timestamp)) {
         return {
             valid: false,
             reason: "Invalid ISO 8601 timestamp.",
         };
     }
 
-    const log_date = new Date(timestamp);
-    const now = new Date();
-
-    if (log_date.getTime() > now.getTime() + 5 * 60 * 1000) {
+    const time_epoch = Date.parse(timestamp);
+    if (Number.isNaN(time_epoch)) {
+        return {
+            valid: false,
+            reason: "Invalid ISO 8601 timestamp.",
+        };
+    }
+    if (time_epoch > Date.now() + FIVE_MINUTES_MS) {
         return {
             valid: false,
             reason: "Timestamp cannot be more than 5 minutes in the future.",
         };
     }
 
-    const valid_levels = ["debug", "info", "warn", "error"];
-
-    if (!valid_levels.includes(level)) {
+    if (!VALID_LEVELS.has(level)) {
         return {
             valid: false,
             reason: "Invalid Level, Must be debug, info, warn, or error.",
@@ -81,7 +86,7 @@ function isValidLog(entry: any): ValidationResult {
     return {
         valid: true,
         data: {
-            timestamp: new Date(timestamp).toISOString(),
+            timestamp: timestamp,
             level: level,
             service: service.trim(),
             message: message.trim(),

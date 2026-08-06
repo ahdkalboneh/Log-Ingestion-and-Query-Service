@@ -1,5 +1,5 @@
 import { pgTable, bigint, timestamp, 
-    text, varchar, jsonb,} from "drizzle-orm/pg-core";
+    text, varchar, jsonb, index} from "drizzle-orm/pg-core";
 
 export const logs = pgTable("logs", {
   id: bigint("id", { mode: "number", }).primaryKey().generatedAlwaysAsIdentity(),
@@ -9,4 +9,7 @@ export const logs = pgTable("logs", {
   message: text("message").notNull(),
   attributes: jsonb("attributes").default({}),
   createdAt: timestamp("created_at", { withTimezone: true, }).defaultNow(),
-});
+},(table) => [
+  index("idx_logs_service_level_time").on(table.service, table.level, table.timestamp.desc(), table.id.desc()),
+  index("idx_logs_timestamp_brin").using("brin", table.timestamp),
+]);
