@@ -1,17 +1,42 @@
 import { pipeline } from "stream/promises";
-import { Readable } from "stream";
+import { Readable, Writable } from "stream";
 import { conn } from "../index.js";
 import { db } from "../index.js"
 import { logs } from "../schema.js"
-import {sql, eq, and, ilike, desc, gte, lt } from "drizzle-orm";
+import {sql, eq, and, or, ilike, desc, gte, lt } from "drizzle-orm";
 import type {LogCopyItem} from "../../types/logs.js";
 import type { LogFilters } from "../../types/logs.js"
 
-function* generateTSV(batch: LogCopyItem[]) {
+function csvEscape(val: string): string {
+    return `"${val.replace(/"/g, '""')}"`;
+}
+
+const YIELD_EVERY = 250;
+
+
+function yieldToEventLoop(): Promise<void> {
+    return new Promise((resolve) => setImmediate(resolve));
+}
+
+async function* generateCSV(batch: LogCopyItem[]) {
     for (let i = 0; i < batch.length; i++) {
-        const item = batch[i];
-        const cleanMsg = item!.message.replace(/[\r\n\t]/g, " ");
-        yield `${item!.timestamp}\t${item!.level}\t${item!.service}\t${cleanMsg}\t${item!.attributes}\n`;
+        const item = batch[i]!;
+        const msg = item.message.replace(/[\r\n]/g, " ");
+        const attrsRaw = typeof item.attributes === "string"
+            ? item.attributes
+            : JSON.stringify(item.attributes);
+ 
+        yield [
+            csvEscape(item.timestamp),
+            csvEscape(item.level),
+            csvEscape(item.service),
+            csvEscape(msg),
+            csvEscape(attrsRaw),
+        ].join(",") + "\n";
+ 
+        if (i > 0 && i % YIELD_EVERY === 0) {
+            await yieldToEventLoop();
+        }
     }
 }
 
@@ -20,14 +45,20 @@ export async function copyLogsToDB(batch: LogCopyItem[]) {
         return;
     }
     
-    const stream = await conn.unsafe(`COPY logs (timestamp, level, service, message, attributes)
+    const query = conn`COPY logs (timestamp, level, service, message, attributes)
                        FROM STDIN
-                       WITH (FORMAT text, DELIMITER E'\\t')`).writable();
-
-    await pipeline(
-        Readable.from(generateTSV(batch)),
-        stream
-    );
+                       WITH (FORMAT csv)`;
+    const stream = await query.writable();
+    try{
+        await pipeline(Readable.from(generateCSV(batch)), stream);
+        await query;
+    } catch(err){
+         console.error("[copyLogsToDB] COPY failed, batch rejected", {
+            batchSize: batch.length,
+            error: err instanceof Error ? err.message : err,
+        });
+        throw err;
+    }
 
 }
 
@@ -55,14 +86,20 @@ export async function queryLogsFromDB(filters: LogFilters) {
             Buffer.from(filters.cursor, "base64").toString()
         );
         conditions.push(
-            lt(logs.timestamp, new Date(decoded.timestamp))
+            or(
+                lt(logs.timestamp, new Date(decoded.timestamp)),
+                and(
+                    eq(logs.timestamp, new Date(decoded.timestamp)),
+                    lt(logs.id, decoded.id)
+                )
+            )
         );
     }
     if (filters.attributes){
         for (const [key, value] of Object.entries(filters.attributes)) {
             conditions.push(
-                sql`${logs.attributes}->>${key} = ${value}`
-            );
+                    sql`${logs.attributes} @> ${JSON.stringify({ [key]: value })}::jsonb`
+                );
         }
     }
 
