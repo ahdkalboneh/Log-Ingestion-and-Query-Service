@@ -1,0 +1,1 @@
+CREATE INDEX "idx_logs_attributes" ON "logs" USING gin ("attributes");

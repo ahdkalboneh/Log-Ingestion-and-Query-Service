@@ -3,12 +3,13 @@ import type {LogEntry, LogCopyItem, ValidationResult,} from "../../types/logs.js
 
 let logsBuffer: LogCopyItem[] = [];
 
-const BUFFER_CAPACITY = 20000; 
-const BATCH_FLUSH_SIZE = 2500; 
-const FLUSH_TIME_INTERVAL = 250; 
+const BUFFER_CAPACITY = 10000; 
+const BATCH_FLUSH_SIZE = 4000; 
+const FLUSH_TIME_INTERVAL = 200; 
 
 let flush_timer: ReturnType<typeof setTimeout> | null = null;
-let is_flushing = false;
+let flushPromise: Promise<void> | null = null;
+
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const VALID_LEVELS = new Set(["debug", "info", "warn", "error"]);
@@ -96,15 +97,17 @@ function isValidLog(entry: any): ValidationResult {
 }
 
 export async function flush() {
-    if (logsBuffer.length === 0 || is_flushing) {
+    if (logsBuffer.length === 0 ) {
         return;
     }
-
-    is_flushing = true;
+    if(flushPromise){
+        return flushPromise;
+    }
 
     const batch_to_add = logsBuffer;
     logsBuffer = [];
 
+    flushPromise =(async() => {
     try {
         await copyLogsToDB(batch_to_add);
     } catch (error) {
@@ -113,8 +116,10 @@ export async function flush() {
             logsBuffer = [...batch_to_add, ...logsBuffer];
         }
     } finally {
-        is_flushing = false;
-    }
+        flushPromise = null;
+    }})();
+
+    return flushPromise;
 }
 
 export async function ingest(logs: LogEntry[]) {
@@ -144,7 +149,7 @@ export async function ingest(logs: LogEntry[]) {
     }
 
     if (logsBuffer.length >= BATCH_FLUSH_SIZE) { 
-        setImmediate(() => flush());
+        await flush();
     } else if (!flush_timer) {
         flush_timer = setTimeout(() => {
             flush_timer = null;

@@ -15,6 +15,13 @@
       "when": 1786018325903,
       "tag": "0001_plain_ken_ellis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786099467794,
+      "tag": "0002_tiny_photon",
+      "breakpoints": true
     }
   ]
 }

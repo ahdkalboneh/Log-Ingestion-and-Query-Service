@@ -1,3 +1,4 @@
+import { pipeline } from "stream/promises";
 import { Readable } from "stream";
 import { conn } from "../index.js";
 import { db } from "../index.js"
@@ -6,25 +7,27 @@ import {sql, eq, and, ilike, desc, gte, lt } from "drizzle-orm";
 import type {LogCopyItem} from "../../types/logs.js";
 import type { LogFilters } from "../../types/logs.js"
 
+function* generateTSV(batch: LogCopyItem[]) {
+    for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        const cleanMsg = item!.message.replace(/[\r\n\t]/g, " ");
+        yield `${item!.timestamp}\t${item!.level}\t${item!.service}\t${cleanMsg}\t${item!.attributes}\n`;
+    }
+}
+
 export async function copyLogsToDB(batch: LogCopyItem[]) {
     if(batch.length === 0 ){
         return;
-    }
-    let tsvData = "";
-    for (const item of batch) {
-        tsvData += `${item.timestamp}\t${item.level}\t${item.service}\t${item.message.replace(/[\r\n\t]/g, " ")}\t${item.attributes}\n`;
     }
     
     const stream = await conn.unsafe(`COPY logs (timestamp, level, service, message, attributes)
                        FROM STDIN
                        WITH (FORMAT text, DELIMITER E'\\t')`).writable();
 
-    await new Promise((resolve, reject) => {
-        const readable = Readable.from([tsvData]);
-        readable.pipe(stream);
-        stream.on("finish", resolve);
-        stream.on("error", reject);
-    });
+    await pipeline(
+        Readable.from(generateTSV(batch)),
+        stream
+    );
 
 }
 
