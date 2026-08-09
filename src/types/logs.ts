@@ -28,3 +28,14 @@ export type LogFilters = {
   q?: string;
   cursor?: string | null;
 };
+
+export type AggregateLogFilters = {
+    since: string;
+    until: string;
+    bucket: "1m" | "5m" | "1h" | "1d";
+    group_by?: "service" | "level";
+    service?: string;
+    level?: string;
+    q?: string;
+    attributes?: Record<string, string>;
+};

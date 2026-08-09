@@ -3,6 +3,7 @@ import { Readable, Writable } from "stream";
 import { conn } from "../index.js";
 import { db } from "../index.js"
 import { logs } from "../schema.js"
+import { logs_rollup1m } from "../schema.js";
 import {sql, eq, and, or, ilike, desc, gte, lt } from "drizzle-orm";
 import type {LogCopyItem} from "../../types/logs.js";
 import type { LogFilters } from "../../types/logs.js"
@@ -124,4 +125,52 @@ export async function queryLogsFromDB(filters: LogFilters) {
         logs: result.slice(0, Number(filters.limit)),
         next_cursor
     };
+}
+
+function buildRollupRows(batch: LogCopyItem[]) {
+  const counts = new Map<string, {
+      bucket_start: Date;
+      service: string;
+      level: string;
+      count: number;
+    }
+    >();
+
+  for (const item of batch){
+    const timestamp = new Date(item.timestamp);
+    const bucket_start = new Date(Math.floor(timestamp.getTime() / 60000) * 60000);
+    const key = `${bucket_start.toISOString()}|${item.service}|${item.level}`;
+    const existing = counts.get(key);
+
+    if (existing){
+      existing.count++;
+    } 
+    else{
+      counts.set(key, {
+        bucket_start,
+        service: item.service,
+        level: item.level,
+        count: 1,
+      });
+    }
+  }
+  return [...counts.values()];
+}
+
+export async function upsertRollup(batch: LogCopyItem[]) {
+  const rows = buildRollupRows(batch);
+  if (rows.length === 0) {
+    return;
+  }
+
+  await db.insert(logs_rollup1m).values(rows).onConflictDoUpdate({
+      target: [
+        logs_rollup1m.bucket_start,
+        logs_rollup1m.service,
+        logs_rollup1m.level,
+      ],
+      set: {
+        count: sql`${logs_rollup1m.count} + excluded.count`,
+      },
+    });
 }

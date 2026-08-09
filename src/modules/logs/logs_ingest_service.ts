@@ -1,4 +1,4 @@
-import { copyLogsToDB } from "../../db/queries/logs.js";
+import { copyLogsToDB, upsertRollup } from "../../db/queries/logs.js";
 import type {LogEntry, LogCopyItem, ValidationResult,} from "../../types/logs.js";
 
 let logsBuffer: LogCopyItem[] = [];
@@ -96,6 +96,45 @@ function isValidLog(entry: any): ValidationResult {
     };
 }
 
+
+let rollupQueue: LogCopyItem[] = [];
+let rollupRunning = false;
+
+const ROLLUP_BATCH_SIZE = 16000;
+
+async function processRollupQueue() {
+    if (rollupRunning) {
+        return;
+    }
+
+    rollupRunning = true;
+
+    try {
+        while (rollupQueue.length > 0) {
+            const batch = rollupQueue.splice(0, ROLLUP_BATCH_SIZE);
+
+            try {
+                await upsertRollup(batch);
+            } catch (error) {
+                console.error("Error updating rollup:", error);
+            }
+        }
+    } finally {
+        rollupRunning = false;
+        if (rollupQueue.length > 0) {
+            void processRollupQueue();
+        }
+    }
+}
+
+function enqueueRollup(batch: LogCopyItem[]) {
+    rollupQueue.push(...batch);
+
+    if (!rollupRunning) {
+        void processRollupQueue();
+    }
+}
+
 export async function flush() {
     if (logsBuffer.length === 0 ) {
         return;
@@ -110,6 +149,8 @@ export async function flush() {
     flushPromise =(async() => {
     try {
         await copyLogsToDB(batch_to_add);
+         enqueueRollup(batch_to_add);
+
     } catch (error) {
         console.log("Error during Bulk Copy to DB:", error);
         if (logsBuffer.length + batch_to_add.length <= BUFFER_CAPACITY) {
