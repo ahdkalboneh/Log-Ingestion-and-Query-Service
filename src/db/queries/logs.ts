@@ -106,7 +106,9 @@ export async function queryLogsFromDB(filters: LogFilters) {
 
     const result = await db.select({id: logs.id,timestamp: logs.timestamp, level: logs.level, service: logs.service, message: logs.message, attributes: logs.attributes})
     .from(logs).where(conditions.length > 0 ? and (...conditions): undefined)
-    .orderBy(desc(logs.timestamp), desc(logs.id))
+    .orderBy(
+    sql`${logs.timestamp} desc nulls last`,
+    sql`${logs.id} desc nulls last`)
     .limit(Number(filters.limit)+1);
     const hasMore = result.length > Number(filters.limit);
 

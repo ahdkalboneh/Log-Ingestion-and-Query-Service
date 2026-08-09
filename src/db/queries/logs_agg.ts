@@ -81,7 +81,7 @@ export async function aggregateFromRawLogs(filters: AggregateLogFilters){
 
 async function aggregateFromRollup(filters: AggregateLogFilters) {
   const rollup =
-    filters.bucket === "1h"
+    filters.bucket === "1h" || filters.bucket === "1d"
       ? logs_rollup1h
       : logs_rollup1m;
 
