@@ -2,6 +2,7 @@ import { app } from "./app.js";
 import { db, checkDatabaseConnection } from "./db/index.js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { setReady } from "./modules/health/health_handler.js";
+import { startRetentionScheduler } from "./services/retention.js";
 
 async function start() {
   try {
@@ -14,7 +15,7 @@ async function start() {
     console.log("Database migrations applied.");
 
     setReady();
-
+    startRetentionScheduler();
     app.listen(8080, () => {
       console.log("Server running on port 8080");
     });

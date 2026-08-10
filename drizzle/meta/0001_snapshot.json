@@ -1,6 +1,6 @@
 {
-  "id": "5c4d530a-50ed-4ac1-abf4-aceeff08d4b0",
-  "prevId": "0824ff75-111f-4a9f-ac91-1fc61dcfc1aa",
+  "id": "9f4dc25b-2fdb-4a00-8d00-3aef74e034be",
+  "prevId": "0166109d-ad86-4a6c-970a-0c8e4a5c066f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -11,18 +11,18 @@
         "id": {
           "name": "id",
           "type": "bigint",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "identity": {
-            "type": "always",
             "name": "logs_id_seq",
-            "schema": "public",
             "increment": "1",
-            "startWith": "1",
             "minValue": "1",
             "maxValue": "9223372036854775807",
+            "startWith": "1",
             "cache": "1",
-            "cycle": false
+            "cycle": false,
+            "schema": "public",
+            "type": "always"
           }
         },
         "timestamp": {
@@ -39,7 +39,7 @@
         },
         "service": {
           "name": "service",
-          "type": "varchar(64)",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -94,9 +94,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "idx_logs_timestamp_brin": {
           "name": "idx_logs_timestamp_brin",
@@ -109,13 +109,42 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "brin",
-          "with": {}
+          "concurrently": false
+        },
+        "idx_logs_timestamp_id": {
+          "name": "idx_logs_timestamp_id",
+          "columns": [
+            {
+              "expression": "timestamp",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "logs_pk": {
+          "name": "logs_pk",
+          "columns": [
+            "timestamp",
+            "id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -124,10 +153,10 @@
   },
   "enums": {},
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

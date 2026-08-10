@@ -1,7 +1,0 @@
-node_modules/
-.env
-dist/
-benchmark.mjs
-concurrent-benchmark.mjs
-seed.db
-lib/

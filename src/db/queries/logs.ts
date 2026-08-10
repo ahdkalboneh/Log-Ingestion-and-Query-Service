@@ -1,10 +1,9 @@
 import { pipeline } from "stream/promises";
-import { Readable, Writable } from "stream";
+import { Readable } from "stream";
 import { conn } from "../index.js";
 import { db } from "../index.js"
 import { logs } from "../schema.js"
-import { logs_rollup1m } from "../schema.js";
-import {sql, eq, and, or, ilike, desc, gte, lt } from "drizzle-orm";
+import {sql, eq, and, or, ilike, gte, lt } from "drizzle-orm";
 import type {LogCopyItem} from "../../types/logs.js";
 import type { LogFilters } from "../../types/logs.js"
 
@@ -52,7 +51,12 @@ export async function copyLogsToDB(batch: LogCopyItem[]) {
     const stream = await query.writable();
     try{
         await pipeline(Readable.from(generateCSV(batch)), stream);
-        await query;
+        await Promise.race([
+            query,
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("COPY timed out")), 10000)
+        ),
+    ]);
     } catch(err){
          console.error("[copyLogsToDB] COPY failed, batch rejected", {
             batchSize: batch.length,
@@ -157,22 +161,4 @@ function buildRollupRows(batch: LogCopyItem[]) {
     }
   }
   return [...counts.values()];
-}
-
-export async function upsertRollup(batch: LogCopyItem[]) {
-  const rows = buildRollupRows(batch);
-  if (rows.length === 0) {
-    return;
-  }
-
-  await db.insert(logs_rollup1m).values(rows).onConflictDoUpdate({
-      target: [
-        logs_rollup1m.bucket_start,
-        logs_rollup1m.service,
-        logs_rollup1m.level,
-      ],
-      set: {
-        count: sql`${logs_rollup1m.count} + excluded.count`,
-      },
-    });
 }
