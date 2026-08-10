@@ -10,6 +10,6 @@ ENV NODE_OPTIONS="--max-old-space-size=210"
 
 COPY . .
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["npm", "start"]
