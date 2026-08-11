@@ -17,7 +17,8 @@ async function start() {
 
     app.listen(8080, "0.0.0.0", () => {
       setReady();
-      startRetentionScheduler();
+          startRetentionScheduler();
+
       console.log("Server running on port 8080");
     });
 
