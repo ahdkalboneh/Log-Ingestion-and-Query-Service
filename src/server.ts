@@ -12,11 +12,12 @@ async function start() {
     await migrate(db, {
       migrationsFolder: "./drizzle",
     });
+
     console.log("Database migrations applied.");
 
-    setReady();
-    startRetentionScheduler();
     app.listen(8080, "0.0.0.0", () => {
+      setReady();
+      startRetentionScheduler();
       console.log("Server running on port 8080");
     });
 
