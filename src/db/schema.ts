@@ -17,7 +17,5 @@ export const logs = pgTable("logs", {
   }),
   index("idx_logs_service_level_time").on(table.service, table.level, table.timestamp.desc(), table.id.desc()),
   index("idx_logs_service_time").on( table.service, table.timestamp.desc(), table.id.desc()),
-  index("idx_logs_message_trgm")
-  .using("gin", sql`${table.message} gin_trgm_ops`),
 ]);
 

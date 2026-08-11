@@ -10,5 +10,3 @@ CREATE TABLE "logs" (
 );
 --> statement-breakpoint
 CREATE INDEX "idx_logs_service_level_time" ON "logs" USING btree ("service","level","timestamp" DESC NULLS LAST,"id" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "idx_logs_timestamp_brin" ON "logs" USING brin ("timestamp");--> statement-breakpoint
-CREATE INDEX "idx_logs_timestamp_id" ON "logs" USING btree ("timestamp" DESC NULLS LAST,"id" DESC NULLS LAST);

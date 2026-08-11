@@ -36,13 +36,6 @@
       "when": 1786462809096,
       "tag": "0004_overconfident_rockslide",
       "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1786464140505,
-      "tag": "0005_gorgeous_mach_iv",
-      "breakpoints": true
     }
   ]
 }
