@@ -6,10 +6,6 @@ import type { Request, Response, NextFunction } from "express";
 
 export const app = express();
 
-app.get("/test", (req, res) => {
-  res.json({ok:true});
-});
-
 app.use(express.json({limit: "50mb"}));
 app.use("/health", healthRoutes);
 app.use("/logs", logsRoutes);

@@ -1,5 +1,6 @@
 import { pgTable, bigint, timestamp, 
     text, jsonb, index, primaryKey} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const logs = pgTable("logs", {
   id: bigint("id", { mode: "number", }).generatedAlwaysAsIdentity(),
@@ -15,7 +16,8 @@ export const logs = pgTable("logs", {
     columns: [table.timestamp, table.id],
   }),
   index("idx_logs_service_level_time").on(table.service, table.level, table.timestamp.desc(), table.id.desc()),
-  index("idx_logs_timestamp_brin").using("brin", table.timestamp),
-  index("idx_logs_timestamp_id").on(table.timestamp.desc(), table.id.desc()),
+  index("idx_logs_service_time").on( table.service, table.timestamp.desc(), table.id.desc()),
+  index("idx_logs_message_trgm")
+  .using("gin", sql`${table.message} gin_trgm_ops`),
 ]);
 

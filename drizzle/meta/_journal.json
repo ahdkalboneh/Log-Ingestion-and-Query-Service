@@ -15,6 +15,34 @@
       "when": 1786378815009,
       "tag": "0001_add_partitioning",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786457640247,
+      "tag": "0002_chubby_robin_chapel",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786459113560,
+      "tag": "0003_tricky_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786462809096,
+      "tag": "0004_overconfident_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786464140505,
+      "tag": "0005_gorgeous_mach_iv",
+      "breakpoints": true
     }
   ]
 }
