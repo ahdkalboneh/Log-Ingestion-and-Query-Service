@@ -24,7 +24,7 @@ export async function managePartitions(): Promise<void> {
   today.setUTCHours(0, 0, 0, 0);
 
   // Create today partition + next 2 days
-  for (let i = 0; i <= 2; i++) {
+  for (let i = -RETENTION_DAYS; i <= 2; i++) {
     const targetDate = new Date(today);
 
     targetDate.setUTCDate(
