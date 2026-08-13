@@ -1,1 +1,0 @@
-DROP INDEX IF EXISTS"idx_logs_timestamp_brin";

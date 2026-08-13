@@ -11,34 +11,25 @@ function csvEscape(val: string): string {
     return `"${val.replace(/"/g, '""')}"`;
 }
 
-const YIELD_EVERY = 250;
-
-
-function yieldToEventLoop(): Promise<void> {
-    return new Promise((resolve) => setImmediate(resolve));
-}
-
 async function* generateCSV(batch: LogCopyItem[]) {
+    let chunk = "";
     for (let i = 0; i < batch.length; i++) {
         const item = batch[i]!;
         const msg = item.message.replace(/[\r\n]/g, " ");
         const attrsRaw = typeof item.attributes === "string"
             ? item.attributes
             : JSON.stringify(item.attributes);
- 
-        yield [
-            csvEscape(item.timestamp),
-            csvEscape(item.level),
-            csvEscape(item.service),
-            csvEscape(msg),
-            csvEscape(attrsRaw),
-        ].join(",") + "\n";
- 
-        if (i > 0 && i % YIELD_EVERY === 0) {
-            await yieldToEventLoop();
+        chunk += `${csvEscape(item.timestamp)},${csvEscape(item.level)},${csvEscape(item.service)},${csvEscape(msg)},${csvEscape(attrsRaw)}\n`; 
+        if (i > 0 && i % 300 === 0) {
+            yield chunk;
+            chunk = "";
         }
     }
+    if (chunk.length > 0) {
+        yield chunk;
+    }
 }
+
 
 export async function copyLogsToDB(batch: LogCopyItem[]) {
     if(batch.length === 0 ){

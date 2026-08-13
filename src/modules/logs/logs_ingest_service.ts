@@ -3,12 +3,12 @@ import type {LogEntry, LogCopyItem, ValidationResult,} from "../../types/logs.js
 
 let logsBuffer: LogCopyItem[] = [];
 
-const BUFFER_CAPACITY = 10000; 
+const BUFFER_CAPACITY = 12000; 
 const BATCH_FLUSH_SIZE = 4000; 
-const FLUSH_TIME_INTERVAL = 200; 
-
+const FLUSH_TIME_INTERVAL = 100; 
+const MAX_CONCURRENT_FLUSHES = 2;
+const inFlightFlushes = new Set<Promise<void>>();
 let flush_timer: ReturnType<typeof setTimeout> | null = null;
-let flushPromise: Promise<void> | null = null;
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
@@ -52,20 +52,11 @@ function isValidLog(entry: any): ValidationResult {
         };
     }
 
-    if (!service || typeof service !== "string" || service.trim() === "") {
-        return {
-            valid: false,
-            reason: "Service Must Be non-empty String.",
-        };
-    }
-    if (service.trim().length > 64) {
-        return {
-            valid: false,
-            reason: "Service Must Be at most 64 characters.",
-        };
+    if (!service || typeof service !== "string" || service.length === 0 || service.length > 64) {
+        return { valid: false, reason: "Invalid Service." };
     }
 
-    if (!message || typeof message !== "string" || message.trim() === "") {
+    if (!message || typeof message !== "string" || message.length === 0) {
         return {
             valid: false,
             reason: "Message Must Be non-empty String.",
@@ -102,36 +93,59 @@ function isValidLog(entry: any): ValidationResult {
     };
 }
 
+
+function scheduleFlush() {
+    if (flush_timer || logsBuffer.length === 0) {
+        return;
+    }
+
+    flush_timer = setTimeout(() => {
+        flush_timer = null;
+
+        void flush().catch((error) => {
+            console.error("[flush] scheduled flush failed", error);
+        });
+    }, FLUSH_TIME_INTERVAL);
+}
+
 export async function flush() {
     if (logsBuffer.length === 0 ) {
         return;
     }
-    if(flushPromise){
-        return flushPromise;
+
+    if (inFlightFlushes.size >= MAX_CONCURRENT_FLUSHES) {
+        await Promise.race(inFlightFlushes).catch(() => {});
+        return flush();
     }
 
-    const batch_to_add = logsBuffer;
-    logsBuffer = [];
+    const batch_to_add = logsBuffer.splice(0, BATCH_FLUSH_SIZE);
 
-    flushPromise =(async() => {
-    try {
-        await copyLogsToDB(batch_to_add);
-    } catch (error) {
-          console.error("[flush] batch dropped", {
-            size: batch_to_add.length,
-            error,
-        });
-    } finally {
-        flushPromise = null;
-        if (logsBuffer.length > 0 && !flush_timer){
-        flush_timer = setTimeout(() => {
-            flush_timer = null;
-            void flush();
-        }, FLUSH_TIME_INTERVAL);
-    }
-    }})();
+    const task = (async () => {
+        try {
+            await copyLogsToDB(batch_to_add);
+        } catch (error) {
+            console.error("[flush] batch failed", {
+                size: batch_to_add.length,
+                error,
+            });
+            logsBuffer.unshift(...batch_to_add);
+            throw error;
+        }
+    })();
 
-    return flushPromise;
+    inFlightFlushes.add(task);
+    task.catch(() => {}).finally(() => {
+        inFlightFlushes.delete(task);
+            if (logsBuffer.length >= BATCH_FLUSH_SIZE) {
+                void flush().catch((error) => {
+                    console.error("[flush] follow-up flush failed", error);
+                });
+            } else if (logsBuffer.length > 0) {
+                scheduleFlush();
+            }
+    });
+
+    return task;
 }
 
 export async function ingest(logs: LogEntry[]) {
@@ -141,10 +155,11 @@ export async function ingest(logs: LogEntry[]) {
 
     const rejected: { index: number; reason: string }[] = [];
     let ingested_count = 0;
-
-    for (const [index, log] of logs.entries()) {
-        if (logsBuffer.length >= BUFFER_CAPACITY) { 
-            await flush();
+for (const [index, log] of logs.entries()) {
+        if (logsBuffer.length >= BUFFER_CAPACITY) {
+            if (inFlightFlushes.size > 0) {
+                await Promise.race(Array.from(inFlightFlushes)).catch(() => {});
+            }
         }
 
         const validate_log = isValidLog(log);
@@ -155,19 +170,18 @@ export async function ingest(logs: LogEntry[]) {
         } else {
             rejected.push({
                 index,
-                reason: validate_log.reason, 
+                reason: validate_log.reason,
             });
         }
     }
 
-    if (logsBuffer.length >= BATCH_FLUSH_SIZE) { 
-        await flush();
-    } else if (!flush_timer) {
-        flush_timer = setTimeout(() => {
-            flush_timer = null;
-            flush();
-        }, FLUSH_TIME_INTERVAL);
+    if (logsBuffer.length >= BATCH_FLUSH_SIZE) {
+        void flush().catch((error) => {
+            console.error("[ingest] background flush failed", error);
+        });
+    } else {
+        scheduleFlush();
     }
-    
+
     return { ingested: ingested_count, rejected };
 }

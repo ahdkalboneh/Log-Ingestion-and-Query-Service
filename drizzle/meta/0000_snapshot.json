@@ -1,5 +1,5 @@
 {
-  "id": "0166109d-ad86-4a6c-970a-0c8e4a5c066f",
+  "id": "fb0ba29b-0658-487d-aa3d-5c938ce1a132",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -80,42 +80,6 @@
               "asc": true,
               "nulls": "last"
             },
-            {
-              "expression": "timestamp",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_logs_timestamp_brin": {
-          "name": "idx_logs_timestamp_brin",
-          "columns": [
-            {
-              "expression": "timestamp",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "brin",
-          "with": {}
-        },
-        "idx_logs_timestamp_id": {
-          "name": "idx_logs_timestamp_id",
-          "columns": [
             {
               "expression": "timestamp",
               "isExpression": false,

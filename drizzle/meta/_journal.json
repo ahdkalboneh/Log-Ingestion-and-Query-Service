@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1786376701898,
-      "tag": "0000_parched_makkari",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1786378815009,
-      "tag": "0001_add_partitioning",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1786457640247,
-      "tag": "0002_chubby_robin_chapel",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1786459113560,
-      "tag": "0003_tricky_roland_deschain",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1786462809096,
-      "tag": "0004_overconfident_rockslide",
+      "when": 1786613410024,
+      "tag": "0000_harsh_sumo",
       "breakpoints": true
     }
   ]

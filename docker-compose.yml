@@ -43,6 +43,10 @@ services:
       - "-c"
       - "shared_buffers=256MB"
       - "-c"
+      - "effective_cache_size=700MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
       - "max_wal_size=4GB"
       - "-c"
       - "checkpoint_timeout=15min"
@@ -50,6 +54,8 @@ services:
       - "checkpoint_completion_target=0.9"
       - "-c"
       - "wal_compression=on"
+      - "-c"
+      - "max_connections=30"
 
 volumes:
   postgres_data:
