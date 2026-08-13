@@ -20,7 +20,7 @@ async function* generateCSV(batch: LogCopyItem[]) {
             ? item.attributes
             : JSON.stringify(item.attributes);
         chunk += `${csvEscape(item.timestamp)},${csvEscape(item.level)},${csvEscape(item.service)},${csvEscape(msg)},${csvEscape(attrsRaw)}\n`; 
-        if (i > 0 && i % 300 === 0) {
+        if (chunk.length >= 1024 * 1024) {
             yield chunk;
             chunk = "";
         }
@@ -40,22 +40,17 @@ export async function copyLogsToDB(batch: LogCopyItem[]) {
                        FROM STDIN
                        WITH (FORMAT csv)`;
     const stream = await query.writable();
+
     try{
         await pipeline(Readable.from(generateCSV(batch)), stream);
-        await Promise.race([
-            query,
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("COPY timed out")), 10000)
-        ),
-    ]);
+        await query;
     } catch(err){
          console.error("[copyLogsToDB] COPY failed, batch rejected", {
             batchSize: batch.length,
             error: err instanceof Error ? err.message : err,
         });
         throw err;
-    }
-
+    } 
 }
 
 export async function queryLogsFromDB(filters: LogFilters) {
@@ -122,34 +117,4 @@ export async function queryLogsFromDB(filters: LogFilters) {
         logs: result.slice(0, Number(filters.limit)),
         next_cursor
     };
-}
-
-function buildRollupRows(batch: LogCopyItem[]) {
-  const counts = new Map<string, {
-      bucket_start: Date;
-      service: string;
-      level: string;
-      count: number;
-    }
-    >();
-
-  for (const item of batch){
-    const timestamp = new Date(item.timestamp);
-    const bucket_start = new Date(Math.floor(timestamp.getTime() / 60000) * 60000);
-    const key = `${bucket_start.toISOString()}|${item.service}|${item.level}`;
-    const existing = counts.get(key);
-
-    if (existing){
-      existing.count++;
-    } 
-    else{
-      counts.set(key, {
-        bucket_start,
-        service: item.service,
-        level: item.level,
-        count: 1,
-      });
-    }
-  }
-  return [...counts.values()];
 }

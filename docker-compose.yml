@@ -55,7 +55,7 @@ services:
       - "-c"
       - "wal_compression=on"
       - "-c"
-      - "max_connections=30"
+      - "max_connections=20"
 
 volumes:
   postgres_data:

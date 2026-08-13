@@ -3,13 +3,12 @@ import type {LogEntry, LogCopyItem, ValidationResult,} from "../../types/logs.js
 
 let logsBuffer: LogCopyItem[] = [];
 
-const BUFFER_CAPACITY = 12000; 
-const BATCH_FLUSH_SIZE = 4000; 
+const BUFFER_CAPACITY = 16000; 
+const BATCH_FLUSH_SIZE = 16000; 
 const FLUSH_TIME_INTERVAL = 100; 
-const MAX_CONCURRENT_FLUSHES = 2;
+const MAX_CONCURRENT_FLUSHES = 6;
 const inFlightFlushes = new Set<Promise<void>>();
 let flush_timer: ReturnType<typeof setTimeout> | null = null;
-
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const VALID_LEVELS = new Set(["debug", "info", "warn", "error"]);
@@ -155,11 +154,18 @@ export async function ingest(logs: LogEntry[]) {
 
     const rejected: { index: number; reason: string }[] = [];
     let ingested_count = 0;
-for (const [index, log] of logs.entries()) {
-        if (logsBuffer.length >= BUFFER_CAPACITY) {
+    for (let i = 0; i < logs.length; i++){
+        const log = logs[i];
+        const index = i;
+
+        while(logsBuffer.length >= BUFFER_CAPACITY) {
             if (inFlightFlushes.size > 0) {
                 await Promise.race(Array.from(inFlightFlushes)).catch(() => {});
             }
+            else {
+            void flush().catch(() => {});
+            await new Promise((r) => setTimeout(r, 10));
+        }
         }
 
         const validate_log = isValidLog(log);

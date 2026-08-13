@@ -3,3 +3,4 @@ benchmark_with_queries.js
 /lib
 /node_modules
 seed-db.ts
+benchmark-local.mjs
