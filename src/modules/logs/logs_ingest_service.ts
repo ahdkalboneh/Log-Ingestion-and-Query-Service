@@ -3,15 +3,24 @@ import type {LogEntry, LogCopyItem, ValidationResult,} from "../../types/logs.js
 
 let logsBuffer: LogCopyItem[] = [];
 
-const BUFFER_CAPACITY = 16000; 
-const BATCH_FLUSH_SIZE = 16000; 
-const FLUSH_TIME_INTERVAL = 100; 
+const BUFFER_CAPACITY = 60000; 
+const BATCH_FLUSH_SIZE = 8000; 
+const FLUSH_TIME_INTERVAL = 50; 
 const MAX_CONCURRENT_FLUSHES = 6;
 const inFlightFlushes = new Set<Promise<void>>();
 let flush_timer: ReturnType<typeof setTimeout> | null = null;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const VALID_LEVELS = new Set(["debug", "info", "warn", "error"]);
+export class BackpressureError extends Error {
+    retryAfterSeconds: number;
+    constructor(retryAfterSeconds = 1) {
+        super("Buffer full, shedding load");
+        this.name = "BackpressureError";
+        this.retryAfterSeconds = retryAfterSeconds;
+    }
+}
+
 
 function isValidLog(entry: any): ValidationResult {
     if (!entry || typeof entry !== "object") {
@@ -113,11 +122,11 @@ export async function flush() {
     }
 
     if (inFlightFlushes.size >= MAX_CONCURRENT_FLUSHES) {
-        await Promise.race(inFlightFlushes).catch(() => {});
-        return flush();
+        scheduleFlush();
+        return ;
     }
 
-    const batch_to_add = logsBuffer.splice(0, BATCH_FLUSH_SIZE);
+    const batch_to_add = logsBuffer.splice(0,BATCH_FLUSH_SIZE);
 
     const task = (async () => {
         try {
@@ -148,8 +157,12 @@ export async function flush() {
 }
 
 export async function ingest(logs: LogEntry[]) {
-    if (!Array.isArray(logs) || logs.length === 0) {
-        return { ingested: 0, rejected: [] };
+
+     if (logsBuffer.length + logs.length > BUFFER_CAPACITY) {
+        if (inFlightFlushes.size < MAX_CONCURRENT_FLUSHES) {
+            void flush().catch(() => {});
+        }
+        throw new BackpressureError(1);
     }
 
     const rejected: { index: number; reason: string }[] = [];

@@ -1,8 +1,8 @@
 import type{ Request, Response } from "express";
-import { ingest } from "./logs_ingest_service.js";
+import { ingest, BackpressureError } from "./logs_ingest_service.js";
 import { queryLogsFromDB } from "../../db/queries/logs.js";
 import type { LogFilters } from "../../types/logs.js";
-
+ 
 const ALLOWED_LOG_LEVELS = new Set(["debug", "info", "warn", "error"]);
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 1000;
@@ -17,25 +17,26 @@ export async function ingestLogsHandler(req: Request, res:Response){
             error: "Request body must contain a logs array",
         });
     }
-
     const result =  await ingest(logs);
-    if(result.ingested === 0){
-        return res.status(400).json({
-          accepted: 0,
-          rejected: result.rejected
-        });
-    }
 
     return res.status(200).json({
         accepted: result.ingested,
         rejected: result.rejected,
     });
 } catch(error) {
- return res.status(500).json({
-   accepted:0,
-   rejected:[],
-   error:"Internal server error"
- });
+  if (error instanceof BackpressureError){
+    res.setHeader("Retry-After", String(error.retryAfterSeconds));
+    return res.status(503).json({
+      accepted: 0,
+      rejected: [],
+      error: "server busy, retry shortly",
+    });
+  }
+   return res.status(500).json({
+    accepted: 0,
+    rejected: [],
+    error: "Internal server error",
+  });
 }
 }
 
@@ -151,5 +152,4 @@ export async function queryLogsHandler(req: Request, res:Response) {
       error: "Internal server error",
     });
   }
-
 }

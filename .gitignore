@@ -4,3 +4,4 @@ benchmark_with_queries.js
 /node_modules
 seed-db.ts
 benchmark-local.mjs
+k6-load-test.js

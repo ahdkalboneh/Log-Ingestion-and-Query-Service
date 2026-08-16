@@ -1,6 +1,6 @@
 import { pipeline } from "stream/promises";
 import { Readable } from "stream";
-import { conn } from "../index.js";
+import { writeConn, readConn } from "../index.js";
 import { db } from "../index.js"
 import { logs } from "../schema.js"
 import {sql, eq, and, or, ilike, gte, lt } from "drizzle-orm";
@@ -16,11 +16,9 @@ async function* generateCSV(batch: LogCopyItem[]) {
     for (let i = 0; i < batch.length; i++) {
         const item = batch[i]!;
         const msg = item.message.replace(/[\r\n]/g, " ");
-        const attrsRaw = typeof item.attributes === "string"
-            ? item.attributes
-            : JSON.stringify(item.attributes);
+        const attrsRaw = item.attributes;
         chunk += `${csvEscape(item.timestamp)},${csvEscape(item.level)},${csvEscape(item.service)},${csvEscape(msg)},${csvEscape(attrsRaw)}\n`; 
-        if (chunk.length >= 1024 * 1024) {
+        if (chunk.length >= 4* 1024 * 1024) {
             yield chunk;
             chunk = "";
         }
@@ -36,7 +34,7 @@ export async function copyLogsToDB(batch: LogCopyItem[]) {
         return;
     }
     
-    const query = conn`COPY logs (timestamp, level, service, message, attributes)
+    const query = writeConn`COPY logs (timestamp, level, service, message, attributes)
                        FROM STDIN
                        WITH (FORMAT csv)`;
     const stream = await query.writable();
@@ -44,13 +42,58 @@ export async function copyLogsToDB(batch: LogCopyItem[]) {
     try{
         await pipeline(Readable.from(generateCSV(batch)), stream);
         await query;
+        await updateMinuteAggregates(batch);
     } catch(err){
          console.error("[copyLogsToDB] COPY failed, batch rejected", {
             batchSize: batch.length,
             error: err instanceof Error ? err.message : err,
         });
+
+        if (!stream.destroyed) {
+            stream.destroy(err instanceof Error ? err : new Error(String(err)));
+        }
         throw err;
     } 
+}
+async function updateMinuteAggregates(batch: LogCopyItem[]) {
+  const groups = new Map<string, {
+    bucketStart: Date;
+    service: string;
+    level: string;
+    count: number;
+  }>();
+
+  for (const item of batch) {
+    const date = new Date(item.timestamp);
+    date.setSeconds(0, 0);
+
+    const key = `${date.toISOString()}|${item.service}|${item.level}`;
+
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.count++;
+    } else {
+      groups.set(key, {
+        bucketStart: date,
+        service: item.service,
+        level: item.level,
+        count: 1,
+      });
+    }
+  }
+
+  for (const group of groups.values()) {
+    await writeConn`
+      INSERT INTO log_minute_aggregates
+        (bucket_start, service, level, count)
+      VALUES
+        (${group.bucketStart}, ${group.service}, ${group.level}, ${group.count})
+      ON CONFLICT (bucket_start, service, level)
+      DO UPDATE SET
+        count = log_minute_aggregates.count + EXCLUDED.count
+    `;
+  }
 }
 
 export async function queryLogsFromDB(filters: LogFilters) {

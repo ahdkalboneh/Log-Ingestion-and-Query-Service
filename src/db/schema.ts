@@ -18,3 +18,18 @@ export const logs = pgTable("logs", {
   index("idx_logs_service_level_time").on(table.service, table.level, table.timestamp.desc(), table.id.desc()),
 ]);
 
+
+export const logMinuteAggregates = pgTable( "log_minute_aggregates", {
+    bucketStart: timestamp("bucket_start", { withTimezone: true, }).notNull(),
+    service: text("service").notNull(),
+    level: text("level").notNull(),
+    count: bigint("count", { mode: "number" }).notNull(),
+  },
+  (table) => [
+   primaryKey({ columns: [ table.bucketStart, table.service, table.level,],}),
+
+    
+    index("log_minute_aggregates_service_bucket_idx").on( table.service, table.bucketStart ),
+    index("log_minute_aggregates_level_bucket_idx").on(table.level,table.bucketStart),
+  ]
+);
