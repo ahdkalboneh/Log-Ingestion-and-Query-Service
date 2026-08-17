@@ -22,7 +22,7 @@ export class BackpressureError extends Error {
 }
 
 
-function isValidLog(entry: any): ValidationResult {
+function isValidLog(entry: any, maxEpoch: number): ValidationResult {
     if (!entry || typeof entry !== "object") {
         return {
             valid: false,
@@ -46,7 +46,7 @@ function isValidLog(entry: any): ValidationResult {
             reason: "Invalid ISO 8601 timestamp.",
         };
     }
-    if (time_epoch > Date.now() + FIVE_MINUTES_MS) {
+    if (time_epoch > maxEpoch) {
         return {
             valid: false,
             reason: "Timestamp cannot be more than 5 minutes in the future.",
@@ -97,6 +97,7 @@ function isValidLog(entry: any): ValidationResult {
             service: service.trim(),
             message: message.trim(),
             attributes: JSON.stringify(attributes ?? {}),
+            bucketEpoch: time_epoch - (time_epoch % 60000),
         },
     };
 }
@@ -167,6 +168,8 @@ export async function ingest(logs: LogEntry[]) {
 
     const rejected: { index: number; reason: string }[] = [];
     let ingested_count = 0;
+    const maxEpoch = Date.now() + FIVE_MINUTES_MS;
+
     for (let i = 0; i < logs.length; i++){
         const log = logs[i];
         const index = i;
@@ -181,7 +184,7 @@ export async function ingest(logs: LogEntry[]) {
         }
         }
 
-        const validate_log = isValidLog(log);
+        const validate_log = isValidLog(log, maxEpoch);
 
         if (validate_log.valid) {
             logsBuffer.push(validate_log.data);

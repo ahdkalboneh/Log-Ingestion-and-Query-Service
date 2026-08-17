@@ -38,6 +38,7 @@ export async function copyLogsToDB(batch: LogCopyItem[]) {
                        FROM STDIN
                        WITH (FORMAT csv)`;
     const stream = await query.writable();
+    stream.on("error", () => {});
 
     try{
         await pipeline(Readable.from(generateCSV(batch)), stream);
@@ -64,10 +65,7 @@ async function updateMinuteAggregates(batch: LogCopyItem[]) {
   }>();
 
   for (const item of batch) {
-    const date = new Date(item.timestamp);
-    date.setSeconds(0, 0);
-
-    const key = `${date.toISOString()}|${item.service}|${item.level}`;
+    const key = `${item.bucketEpoch}|${item.service}|${item.level}`;
 
     const existing = groups.get(key);
 
@@ -75,7 +73,7 @@ async function updateMinuteAggregates(batch: LogCopyItem[]) {
       existing.count++;
     } else {
       groups.set(key, {
-        bucketStart: date,
+        bucketStart: new Date(item.bucketEpoch),
         service: item.service,
         level: item.level,
         count: 1,
@@ -83,12 +81,24 @@ async function updateMinuteAggregates(batch: LogCopyItem[]) {
     }
   }
 
-  for (const group of groups.values()) {
+  const rows = [...groups.values()]
+    .sort((a, b) =>
+      a.bucketStart.getTime() - b.bucketStart.getTime() ||
+      a.service.localeCompare(b.service) ||
+      a.level.localeCompare(b.level)
+    )
+    .map((g) => ({
+      bucket_start: g.bucketStart,
+      service: g.service,
+      level: g.level,
+      count: g.count,
+    }));
+
+  const CHUNK = 1000;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
     await writeConn`
-      INSERT INTO log_minute_aggregates
-        (bucket_start, service, level, count)
-      VALUES
-        (${group.bucketStart}, ${group.service}, ${group.level}, ${group.count})
+      INSERT INTO log_minute_aggregates ${writeConn(chunk, "bucket_start", "service", "level", "count")}
       ON CONFLICT (bucket_start, service, level)
       DO UPDATE SET
         count = log_minute_aggregates.count + EXCLUDED.count

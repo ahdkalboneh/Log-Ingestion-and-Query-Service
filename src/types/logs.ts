@@ -12,6 +12,7 @@ export type LogCopyItem = {
     service: string;
     message: string;
     attributes: string;
+    bucketEpoch: number;
 };
 
 export type ValidationResult =

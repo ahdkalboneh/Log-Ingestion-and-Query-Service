@@ -12,7 +12,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-
+    restart: unless-stopped
     cpus: 0.5
     mem_limit: 256m
     
@@ -41,9 +41,11 @@ services:
       - "-c"
       - "synchronous_commit=off"
       - "-c"
-      - "shared_buffers=256MB"
+      - "shared_buffers=320MB"
       - "-c"
-      - "effective_cache_size=700MB"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "work_mem=48MB"
       - "-c"
       - "maintenance_work_mem=128MB"
       - "-c"
@@ -55,7 +57,36 @@ services:
       - "-c"
       - "wal_compression=on"
       - "-c"
-      - "max_connections=20"
+      - "max_connections=30"
+
+  seed:
+    image: node:22-alpine
+    profiles: ["bench"]
+    working_dir: /scripts
+    volumes:
+      - ./bench:/scripts
+    environment:
+      BASE_URL: http://app:8080
+      SEED_COUNT: ${SEED_COUNT:-1000000}
+      SEED_DAYS_BACK: ${SEED_DAYS_BACK:-29}
+      SEED_BATCH: ${SEED_BATCH:-500}
+      SEED_CONCURRENCY: ${SEED_CONCURRENCY:-8}
+    command: node seed-via-api.mjs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  k6:
+    image: grafana/k6:latest
+    profiles: ["bench"]
+    volumes:
+      - ./bench:/scripts
+    environment:
+      BASE_URL: http://app:8080
+      SCENARIO: ${SCENARIO:-load}
+      AVG_BATCH_SIZE: ${AVG_BATCH_SIZE:-100}
+      MAX_VUS: ${MAX_VUS:-800}
+    command: run /scripts/k6-load-test.js
 
 volumes:
   postgres_data:

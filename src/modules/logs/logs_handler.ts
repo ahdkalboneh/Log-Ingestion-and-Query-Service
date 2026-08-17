@@ -19,6 +19,13 @@ export async function ingestLogsHandler(req: Request, res:Response){
     }
     const result =  await ingest(logs);
 
+    if(result.ingested === 0){
+        return res.status(400).json({
+          accepted: 0,
+          rejected: result.rejected,
+        });
+    }
+
     return res.status(200).json({
         accepted: result.ingested,
         rejected: result.rejected,
