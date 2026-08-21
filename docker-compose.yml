@@ -18,7 +18,7 @@ services:
     
 
   postgres:
-    image: postgres:16
+    image: postgres:17
     container_name: logs-postgres
     mem_limit: 1g
     cpus: 1
@@ -26,6 +26,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-logs_db}
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
     ports:
       - "5433:5432"
     volumes:
@@ -58,6 +59,10 @@ services:
       - "wal_compression=on"
       - "-c"
       - "max_connections=30"
+      - "-c"
+      - "autovacuum_naptime=30s"
+      - "-c"
+      - "autovacuum_vacuum_cost_limit=800"
 
   seed:
     image: node:22-alpine

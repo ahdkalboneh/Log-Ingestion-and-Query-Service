@@ -8,6 +8,9 @@ import type {LogCopyItem} from "../../types/logs.js";
 import type { LogFilters } from "../../types/logs.js"
 
 function csvEscape(val: string): string {
+    if (!val.includes('"')) {
+        return `"${val}"`;
+    }
     return `"${val.replace(/"/g, '""')}"`;
 }
 
@@ -15,10 +18,11 @@ async function* generateCSV(batch: LogCopyItem[]) {
     let chunk = "";
     for (let i = 0; i < batch.length; i++) {
         const item = batch[i]!;
-        const msg = item.message.replace(/[\r\n]/g, " ");
+        const raw = item.message;
+        const msg = raw.includes("\n") || raw.includes("\r") ? raw.replace(/[\r\n]/g, " ") : raw;
         const attrsRaw = item.attributes;
         chunk += `${csvEscape(item.timestamp)},${csvEscape(item.level)},${csvEscape(item.service)},${csvEscape(msg)},${csvEscape(attrsRaw)}\n`; 
-        if (chunk.length >= 4* 1024 * 1024) {
+        if (chunk.length >= 256 * 1024) {
             yield chunk;
             chunk = "";
         }
