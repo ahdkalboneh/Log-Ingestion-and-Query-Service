@@ -555,7 +555,42 @@ Performance can vary depending on:
 * Docker/container resource limits
 
 ---
+# Benchmark Results
 
+The service was evaluated using the official benchmark with Docker Compose and the required resource limits.
+
+| Metric | Result |
+|---|---:|
+| **Overall Score** | **97.35 / 100** |
+| **Correctness** | **15 / 15 (100%)** |
+| **Performance** | **47.50 / 50 (95.0%)** |
+| **Queries** | **14.86 / 15 (99.04%)** |
+| **Reliability** | **20 / 20 (100%)** |
+| **Peak Throughput** | **20,472 logs/sec** |
+| **Load Throughput** | **14,999 logs/sec** |
+| **Load Error Rate** | **0%** |
+| **Load p95 Latency** | **3.77 ms** |
+| **Load Aggregation p95** | **8 ms** |
+| **Eventual Consistency** | **4 / 4 scenarios passed** |
+
+### Scenario Results
+
+| Scenario | Throughput | Error Rate | p95 Latency | Aggregation p95 | Result |
+|---|---:|---:|---:|---:|---|
+| **Load** | 14,999 logs/s | 0% | 3.77 ms | 8 ms | Passed |
+| **Stress** | 20,468 logs/s | 0% | 239.73 ms | 9.46 s | Passed |
+| **Spike** | 15,260 logs/s | 0% | 194.35 ms | 5.19 s | Passed |
+| **Breakpoint** | 20,472 logs/s | 0% | 290.56 ms | 15.59 s | Passed |
+
+### Benchmark Notes
+
+- All **15/15 correctness checks** passed.
+- All **4/4 reliability scenarios** passed with **0% error rate**.
+- The normal **load scenario** sustained approximately **15,000 logs/sec** with a **3.77 ms p95 ingestion latency**.
+- The benchmark was executed with the required resource limits: **0.5 CPU / 256 MB** for the application and **1 CPU / 1 GB** for PostgreSQL.
+- Some stress, spike, and breakpoint scenarios were **generator-limited rather than service-limited**, meaning the benchmark generator could not start all scheduled iterations. These results should therefore be interpreted as directional for those scenarios.
+- Aggregation latency increases under heavy stress because aggregation queries compete with high ingestion workloads.
+---
 # Known Limitations
 
 ### Flat JSONB Attributes
