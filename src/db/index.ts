@@ -14,7 +14,7 @@ export const readConn = postgres(config.db.url, {
   max: 7,                 
   idle_timeout: 20,
   connect_timeout: 10,
-  connection: { statement_timeout: 5000 }, 
+  connection: { statement_timeout: 10000 }, 
 });
 
 export const db = drizzle(readConn, { schema });

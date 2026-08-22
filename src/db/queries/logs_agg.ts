@@ -89,10 +89,7 @@ export async function aggregateLogsFromDB(filters: AggregateLogFilters) {
     // ============================
 
     const conditions = [
-        gte(
-            logMinuteAggregates.bucketStart,
-            new Date(filters.since)
-        ),
+        sql`${logMinuteAggregates.bucketStart} >= date_trunc('minute', ${filters.since}::timestamptz)`,
         lt(
             logMinuteAggregates.bucketStart,
             new Date(filters.until)

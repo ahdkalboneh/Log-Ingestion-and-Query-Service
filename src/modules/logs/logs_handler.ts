@@ -155,6 +155,7 @@ export async function queryLogsHandler(req: Request, res:Response) {
     return res.status(200).json(result);
 
   } catch (error) {
+    console.error("[queryLogs] failed", error);
     return res.status(500).json({
       error: "Internal server error",
     });

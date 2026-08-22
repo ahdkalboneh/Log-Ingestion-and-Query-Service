@@ -3,7 +3,7 @@ import { Readable } from "stream";
 import { writeConn, readConn } from "../index.js";
 import { db } from "../index.js"
 import { logs } from "../schema.js"
-import {sql, eq, and, or, ilike, gte, lt } from "drizzle-orm";
+import {sql, eq, and, ilike, gte, lt } from "drizzle-orm";
 import type {LogCopyItem} from "../../types/logs.js";
 import type { LogFilters } from "../../types/logs.js"
 
@@ -134,13 +134,7 @@ export async function queryLogsFromDB(filters: LogFilters) {
             Buffer.from(filters.cursor, "base64").toString()
         );
         conditions.push(
-            or(
-                lt(logs.timestamp, new Date(decoded.timestamp)),
-                and(
-                    eq(logs.timestamp, new Date(decoded.timestamp)),
-                    lt(logs.id, decoded.id)
-                )
-            )
+            sql`(${logs.timestamp}, ${logs.id}) < (${decoded.timestamp}::timestamptz, ${decoded.id}::bigint)`
         );
     }
     if (filters.attributes){
